@@ -20,7 +20,21 @@ import java.net.MalformedURLException;
 import java.util.ArrayList;
 import java.util.List;
 
+
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+
 public class FeaturedStreamsActivity extends LazyMainActivity<StreamInfo> {
+
+    private final ExecutorService executor = Executors.newSingleThreadExecutor();
+
 
     @Override
     protected int getActivityIconRes() {
@@ -56,9 +70,45 @@ public class FeaturedStreamsActivity extends LazyMainActivity<StreamInfo> {
         Log.i(LOG_TAG, "Adding Featured Streams: " + aObjectList.size());
     }
 
+
+    public List<StreamInfo> getVisualElements() throws JSONException, MalformedURLException {
+        List<StreamInfo> resultList = new ArrayList<>();
+        final String URL = "https://api.twitch.tv/helix/streams?first=" + getLimit() + (getCursor() != null ? "&after=" + getCursor() : "");
+
+        // Execute the HTTP request asynchronously
+        Future<String> jsonResponseFuture = executor.submit(() -> {
+            return Service.urlToJSONStringHelix(URL, this);
+        });
+
+        try {
+            String jsonString = jsonResponseFuture.get(); // This will wait for the request to complete
+            JSONObject fullDataObject = new JSONObject(jsonString);
+            JSONArray topFeaturedArray = fullDataObject.getJSONArray("data");
+            setCursor(fullDataObject.getJSONObject("pagination").getString("cursor"));
+
+            for (int i = 0; i < topFeaturedArray.length(); i++) {
+                // Get all the JSON objects we need to get all the required data.
+                JSONObject streamObject = topFeaturedArray.getJSONObject(i);
+                StreamInfo mStreamInfo = JSONService.getStreamInfo(getBaseContext(), streamObject, false);
+                mStreamInfo.setPriority(1);
+                resultList.add(mStreamInfo);
+            }
+        } catch (InterruptedException e) {
+            // Handle the interruption, e.g., decide whether to retry or exit
+            System.out.println("Thread was interrupted while waiting for the result.");
+        } catch (Exception e) {
+            // Handle exceptions appropriately
+            System.err.println("ExceptionType occurred: " + e.getMessage());
+            e.printStackTrace();
+        }
+
+        return resultList;
+    }
+
+
     /**
      * Methods for functionality and for controlling the SwipeRefreshLayout
-     */
+
     @Override
     public List<StreamInfo> getVisualElements() throws JSONException, MalformedURLException {
         List<StreamInfo> resultList = new ArrayList<>();
@@ -67,6 +117,7 @@ public class FeaturedStreamsActivity extends LazyMainActivity<StreamInfo> {
         final String URL = "https://api.twitch.tv/helix/streams?first=" + getLimit() + (getCursor() != null ? "&after=" + getCursor() : "");
 
         String jsonString = Service.urlToJSONStringHelix(URL, this);
+
         JSONObject fullDataObject = new JSONObject(jsonString);
         JSONArray topFeaturedArray = fullDataObject.getJSONArray("data");
         setCursor(fullDataObject.getJSONObject("pagination").getString("cursor"));
@@ -80,5 +131,5 @@ public class FeaturedStreamsActivity extends LazyMainActivity<StreamInfo> {
         }
 
         return resultList;
-    }
+    }*/
 }

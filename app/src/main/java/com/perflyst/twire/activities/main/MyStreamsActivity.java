@@ -29,6 +29,8 @@ import java.util.concurrent.ExecutionException;
 
 public class MyStreamsActivity extends LazyMainActivity<StreamInfo> {
 
+    private static final int MAX_RETRY_COUNT = 3; // You can adjust this number as needed
+
     @Override
     protected int getActivityIconRes() {
         return R.drawable.ic_favorite;
@@ -74,8 +76,26 @@ public class MyStreamsActivity extends LazyMainActivity<StreamInfo> {
         final String ARRAY_KEY = "data";
         for (List<ChannelInfo> chunk : Lists.partition(channels, 100)) {
             String url = helix_url + Joiner.on("").join(Lists.transform(chunk, channelInfo -> "&user_id=" + channelInfo.getUserId()));
+
+            String temp_jsonString = null;
+            int retryCount = 0;
+
+            // Add a loop to handle retries if the response is null
+            while (temp_jsonString == null && retryCount < MAX_RETRY_COUNT) {
+                temp_jsonString = Service.urlToJSONStringHelix(url, this);
+                retryCount++;
+            }
+
+            if (temp_jsonString == null) {
+                // Handle the case where all retries failed
+                // You can throw an exception or take appropriate action
+                throw new RuntimeException("Failed to fetch data after multiple retries");
+            }
+
+
+
             // request the url
-            String temp_jsonString = Service.urlToJSONStringHelix(url, this);
+            //String temp_jsonString = Service.urlToJSONStringHelix(url, this);
             JSONObject fullDataObject = new JSONObject(temp_jsonString);
             // create the array
             JSONArray temp_array = fullDataObject.getJSONArray(ARRAY_KEY);
